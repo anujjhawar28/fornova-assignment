@@ -1,0 +1,125 @@
+// Data structures
+let elevators = [];
+let passengers = [];
+
+// Function to request an elevator
+function requestElevatorFromPassenger(name, targetFloor, currentFloor) {
+    if (targetFloor === currentFloor) {
+        console.error("Target floor and current floor cannot be the same.");
+        return;
+    }
+
+    const passengerData = { name, targetFloor, currentFloor };
+
+    // Determine the requested direction
+    const requestedDirection = targetFloor > currentFloor ? 'up' : 'down';
+
+    // Find elevators moving in the same direction
+    const sameDirectionElevators = elevators.filter(elevator => elevator.direction === requestedDirection);
+
+    if (sameDirectionElevators.length > 0) {
+        // Find the closest elevator
+        const closestElevator = findClosestElevator(sameDirectionElevators, currentFloor);
+
+        if (closestElevator.distance === 0) {
+            // Elevator is at the passenger's current floor
+            closestElevator.elevator.currentPassengers.push(passengerData);
+            closestElevator.elevator.targetFloor = getTargetFloorFromPassengers(closestElevator.elevator.currentPassengers, closestElevator.elevator.direction);
+        } else {
+            closestElevator.elevator.inQueuePassenger.push(passengerData);
+        }
+        return;
+    }
+
+    // No elevator moving in the requested direction, check idle elevators
+    const idleElevators = elevators.filter(elevator => elevator.direction === 'idle');
+
+    if (idleElevators.length > 0) {
+        const closestElevator = findClosestElevator(idleElevators, currentFloor);
+
+        if (closestElevator.distance === 0) {
+            closestElevator.elevator.currentPassengers.push(passengerData);
+            closestElevator.elevator.targetFloor = getTargetFloorFromPassengers(closestElevator.elevator.currentPassengers, closestElevator.elevator.direction);
+        } else {
+            closestElevator.elevator.inQueuePassenger.push(passengerData);
+        }
+        return;
+    }
+
+    // No elevator moving in the requested direction or idle, find the closest elevator completing its task soon
+    const nearestElevator = findNearestElevatorToCompleteTask(currentFloor);
+    nearestElevator.elevator.inQueuePassenger.push(passengerData);
+}
+
+// Function to find the closest elevator based on current floor
+function findClosestElevator(elevators, currentFloor) {
+    return elevators.reduce((closest, elevator) => {
+        const distance = Math.abs(elevator.currentFloor - currentFloor);
+        if (distance < closest.distance || (distance === closest.distance && elevator.direction === 'up')) {
+            return { elevator, distance };
+        }
+        return closest;
+    }, { elevator: null, distance: Infinity });
+}
+
+// Function to find the nearest elevator to complete its task
+function findNearestElevatorToCompleteTask(currentFloor) {
+    const allElevatorTasks = elevators.map(elevator => {
+        const timeToCompleteCurrentTask = elevator.direction === 'down'
+            ? elevator.currentFloor - elevator.targetFloor
+            : elevator.targetFloor - elevator.currentFloor;
+
+        const timeToReachPassenger = Math.abs(currentFloor - elevator.currentFloor);
+        return { elevator, time: timeToCompleteCurrentTask + timeToReachPassenger };
+    });
+
+    return allElevatorTasks.reduce((nearest, task) => {
+        return task.time < nearest.time ? task : nearest;
+    }, { elevator: null, time: Infinity });
+}
+
+// Function to get the target floor based on the passengers' direction
+function getTargetFloorFromPassengers(passengers, direction = 'up') {
+    if (direction === 'up') {
+        return passengers.reduce((max, passenger) => Math.max(max, passenger.targetFloor), -Infinity);
+    } else {
+        return passengers.reduce((min, passenger) => Math.min(min, passenger.targetFloor), Infinity);
+    }
+}
+
+// Function to update elevator status
+function updateElevators() {
+    setInterval(() => {
+        elevators.forEach(elevator => {
+            if (elevator.direction !== 'idle') {
+                elevator.currentFloor += elevator.direction === 'up' ? 1 : -1;
+
+                // Pick up passengers at the current floor
+                const boardingPassengers = elevator.inQueuePassenger.filter(passenger => passenger.currentFloor === elevator.currentFloor);
+                elevator.currentPassengers.push(...boardingPassengers);
+                elevator.inQueuePassenger = elevator.inQueuePassenger.filter(passenger => passenger.currentFloor !== elevator.currentFloor);
+
+                // Update the target floor for the elevator
+                elevator.targetFloor = getTargetFloorFromPassengers(elevator.currentPassengers, elevator.direction);
+
+                // Drop off passengers who have reached their target floor
+                elevator.currentPassengers = elevator.currentPassengers.filter(passenger => passenger.targetFloor !== elevator.currentFloor);
+            }
+
+            // Check if elevator has reached the target floor
+            if (elevator.currentFloor === elevator.targetFloor) {
+                if (elevator.inQueuePassenger.length > 0) {
+                    elevator.direction = elevator.inQueuePassenger[0].targetFloor > elevator.currentFloor ? 'up' : 'down';
+                    elevator.targetFloor = elevator.inQueuePassenger[0].targetFloor;
+                    elevator.currentPassengers.push(elevator.inQueuePassenger.shift());
+                } else {
+                    elevator.direction = 'idle';
+                    elevator.targetFloor = elevator.currentFloor;
+                }
+            }
+        });
+    }, timeToMoveFloorByElevator);
+}
+
+// Ensure this variable is defined
+const timeToMoveFloorByElevator = 1000; // Example time to move one floor, adjust as needed

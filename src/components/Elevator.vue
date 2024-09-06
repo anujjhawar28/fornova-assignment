@@ -1,29 +1,23 @@
 <template>
-  <div class="elevator">
-    <p>Elevator {{ id }}</p>
-    <p>Current Floor: {{ currentFloor }}</p>
-    <p>Status: {{ status }}</p>
-  </div>
+  <BaseTable :rows="rows" :columns="columns" />
 </template>
 
-<script>
-export default {
-  props: {
-    elevator: {
-      type: Object,
-      required: true
-    }
-  },
-  computed: {
-    id() {
-      return this.elevator.id
-    },
-    currentFloor() {
-      return this.elevator.currentFloor
-    },
-    status() {
-      return this.elevator.status
-    }
+<script setup>
+import { reactive, computed } from 'vue'
+import BaseTable from './BaseTable.vue'
+
+const props = defineProps({
+  elevators: {
+    type: Array,
+    required: true,
+    default: () => []
   }
-}
+})
+
+const columns = reactive(['Elevator No', 'Current Floor', 'Status', 'Target Floor', 'Direction'])
+const rows = computed(() =>
+  props.elevators.map(({ id, currentFloor, status, targetFloor, direction }) => {
+    return [id, currentFloor, status, targetFloor, direction]
+  })
+)
 </script>

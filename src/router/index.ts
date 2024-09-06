@@ -11,8 +11,8 @@ const router = createRouter({
         {
           path: '/',
           name: 'building',
-          component: () => import('@/views/Building.vue')
-        }
+          component: () => import('@/views/DispatchPanel2.vue')
+        },
       ]
     }
   ]

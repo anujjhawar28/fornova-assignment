@@ -14,10 +14,10 @@ const props = defineProps({
   }
 })
 
-const columns = reactive(['Elevator No', 'Current Floor', 'Status', 'Target Floor', 'Direction'])
+const columns = reactive(['Elevator No', 'Current Floor', 'Target Floor', 'Direction'])
 const rows = computed(() =>
-  props.elevators.map(({ id, currentFloor, status, targetFloor, direction }) => {
-    return [id, currentFloor, status, targetFloor, direction]
+  props.elevators.map(({ id, currentFloor, targetFloor, direction }) => {
+    return [id, currentFloor, targetFloor, direction]
   })
 )
 </script>

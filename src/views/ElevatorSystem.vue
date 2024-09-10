@@ -1,39 +1,64 @@
 <template>
   <div class="container">
     <!-- Input fields for number of floors and elevators -->
-    <div class="grid grid-cols-3 gap-x-4 my-4 items-end">
-      <BaseInput type="number" label="Number of Floors" name="numFloors" v-model="numFloors" />
-      <BaseInput
-        type="number"
-        label="Number of Elevator"
-        name="numElevators"
-        v-model="numElevators"
-      />
+    <div class="input-container">
+      <div class="input-group">
+        <label for="floors">Number of Floors:</label>
+        <input type="number" v-model="numFloors" min="1" id="floors" :disabled="gridRendered" />
+      </div>
+      <div class="input-group">
+        <label for="elevators">Number of Elevators:</label>
+        <input
+          type="number"
+          v-model="numElevators"
+          min="1"
+          id="elevators"
+          :disabled="gridRendered"
+        />
+      </div>
       <button
-        type="button"
-        class="w-1/3 block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
         @click="initializeSystem"
+        v-if="!gridRendered"
+        type="button"
+        class="mt-4 w-1/4 block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
       >
         Submit
+      </button>
+      <button
+        @click="gridRendered = !gridRendered"
+        v-else
+        type="button"
+        class="mt-4 w-1/4 block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+      >
+        Edit
       </button>
     </div>
 
     <!-- Passenger details input -->
-    <div v-if="gridRendered" class="grid grid-cols-4 gap-x-4 my-4 items-end">
-      <BaseInput label="Passenger Name" name="passengerName" v-model="passengerName" />
-      <BaseInput type="number" label="Current Floor" name="currentFloor" v-model="currentFloor" />
-      <BaseInput type="number" label="Target Floor" name="targetFloor" v-model="targetFloor" />
+    <div v-if="gridRendered" class="passenger-input-container">
+      <div class="input-group">
+        <label for="passenger">Passenger Name:</label>
+        <input type="text" v-model="passengerName" id="passenger" />
+      </div>
+      <div class="input-group">
+        <label for="current-floor">Current Floor:</label>
+        <input type="number" v-model="currentFloor" :max="numFloors" min="1" id="current-floor" />
+      </div>
+      <div class="input-group">
+        <label for="target-floor">Target Floor:</label>
+        <input type="number" v-model="targetFloor" :max="numFloors" min="1" id="target-floor" />
+      </div>
       <button
         @click="requestElevator"
-        class="w-3/4 block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+        class="mt-4 w-2/3 block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
       >
         Request Elevator
       </button>
     </div>
 
     <!-- Grid layout for floors, elevators, and extra columns/row -->
-    <div v-if="gridRendered" class="grid-container" :style="gridStyle">
-      <div v-for="floorIndex in numFloors" :key="floorIndex" class="contents">
+    <div v-if="gridRendered" class="grid-container mb-10" :style="gridStyle">
+      <div v-for="floorIndex in numFloors" :key="floorIndex" class="row">
         <div class="floor-number">Floor {{ numFloors - floorIndex + 1 }}</div>
 
         <!-- Data storage to display queued passengers -->
@@ -48,11 +73,13 @@
 
         <!-- Elevator cells -->
         <div
-          v-for="(elevator, elevatorIndex) in numElevators"
+          v-for="(_elevator, elevatorIndex) in numElevators"
           :key="elevatorIndex"
           class="floor"
           :class="{
-            highlight: elevators[elevatorIndex].currentFloor === numFloors - floorIndex + 1
+            highlight:
+              elevators[elevatorIndex] &&
+              elevators[elevatorIndex].currentFloor === numFloors - floorIndex + 1
           }"
         >
           <!-- Display current passengers only in the highlighted elevator box -->
@@ -70,20 +97,36 @@
       <div class="empty-cell"></div>
       <div class="empty-cell"></div>
       <div
-        v-for="(elevator, elevatorIndex) in numElevators"
+        v-for="(_elevator, elevatorIndex) in numElevators"
         :key="elevatorIndex"
         class="elevator-number"
       >
         Elevator {{ elevatorIndex + 1 }}
       </div>
     </div>
-    {{ elevators }}
+
+    <div v-if="allRequestsPassengers.length">
+      <div class="text-base font-semibold leading-1 text-gray-900">Passengers</div>
+      <BaseTable :rows="allRequestsPassengers" :columns="allPassengersColumns" />
+    </div>
+
+    <div v-if="elevators.length">
+      <div class="text-base font-semibold leading-1 text-gray-900">Elevators</div>
+      <Elevator :elevators="elevators" />
+    </div>
+
+    <div v-if="allRequestsRows.length">
+      <div class="text-base font-semibold leading-1 text-gray-900">Request History</div>
+      <BaseTable :rows="allRequestsRows" :columns="allRequestsColumns" />
+    </div>
   </div>
 </template>
 
 <script setup>
-import BaseInput from '@/components/BaseInput.vue'
-import { ref, computed, onMounted } from 'vue'
+import BaseTable from '@/components/BaseTable.vue'
+import Elevator from '@/components/Elevator.vue'
+import { reactive } from 'vue'
+import { ref, computed } from 'vue'
 
 // State variables
 const numFloors = ref(1)
@@ -94,12 +137,29 @@ const currentFloor = ref(1)
 const targetFloor = ref(1)
 const elevators = ref([])
 const allPassengers = ref([])
+const allRequests = ref([])
+const allRequestsColumns = reactive(['Name', 'Current Floor', 'Target Floor'])
+const allPassengersColumns = reactive(['Name', 'Current Floor', 'Target Floor'])
+const allRequestsRows = computed(() => {
+  const rows = []
+  allRequests.value.forEach((request) => {
+    rows.push([request.name, request.currentFloor, request.targetFloor])
+  })
+  return rows
+})
+const allRequestsPassengers = computed(() => {
+  const rows = []
+  allPassengers.value.forEach((passenger) => {
+    rows.push([passenger.name, passenger.currentFloor, passenger.targetFloor])
+  })
+  return rows
+})
 
 // Computed property for the grid layout style
 const gridStyle = computed(() => ({
   display: 'grid',
   gridTemplateColumns: `auto auto repeat(${numElevators.value}, 1fr)`,
-  gridTemplateRows: `repeat(${parseInt(numFloors.value) + 1}, 1fr)`,
+  gridTemplateRows: `repeat(${numFloors.value + 1}, 1fr)`,
   gap: '10px'
 }))
 
@@ -119,7 +179,7 @@ const initializeSystem = () => {
 }
 
 // Request an elevator for a passenger
-const requestElevator = () => {
+const requestElevator1 = () => {
   if (targetFloor.value === currentFloor.value) {
     alert('Target floor and current floor cannot be the same.')
     return
@@ -133,11 +193,14 @@ const requestElevator = () => {
 
   allPassengers.value.push(passenger)
   requestElevatorFromPassenger(passenger.name, passenger.targetFloor, passenger.currentFloor)
+  passengerName.value = ''
+  currentFloor.value = 1
+  targetFloor.value = 1
 }
 
 // Filter passengers waiting at a specific floor
 const passengersInQueueAtFloor = (floor) => {
-  return allPassengers.value.filter((passenger) => passenger.currentFloor === floor)
+  return (allPassengers.value ?? []).filter((passenger) => passenger.currentFloor === floor)
 }
 
 // Main elevator request logic
@@ -249,8 +312,19 @@ const startElevatorUpdate = () => {
   setInterval(() => {
     elevators.value.forEach((elevator) => {
       if (elevator.direction !== 'idle') {
-        elevator.currentFloor += elevator.direction === 'up' ? 1 : -1
+        // Prevent elevators from going beyond floor limits
+        if (elevator.currentFloor === numFloors.value) {
+          elevator.direction = 'down'
+        } else if (elevator.currentFloor === 1) {
+          elevator.direction = 'up'
+        }
+        if (elevator.direction === 'up' && elevator.currentFloor < numFloors.value) {
+          elevator.currentFloor += 1
+        } else if (elevator.direction === 'down' && elevator.currentFloor > 1) {
+          elevator.currentFloor -= 1
+        }
 
+        // Passengers boarding
         const boardingPassengers = elevator.inQueuePassenger.filter(
           (passenger) => passenger.currentFloor === elevator.currentFloor
         )
@@ -259,17 +333,31 @@ const startElevatorUpdate = () => {
           (passenger) => passenger.currentFloor !== elevator.currentFloor
         )
 
+        // Update target floor
         elevator.targetFloor = getTargetFloorFromPassengers(
           elevator.currentPassengers,
           elevator.direction
         )
 
-        elevator.currentPassengers = elevator.currentPassengers.filter(
-          (passenger) => passenger.targetFloor !== elevator.currentFloor
-        )
+        // Remove passengers who have reached their target floor
+        elevator.currentPassengers = elevator.currentPassengers.filter((passenger) => {
+          if (passenger.targetFloor !== elevator.currentFloor) {
+            allPassengers.value = allPassengers.value.filter(
+              (all) =>
+                all.name !== passenger.name &&
+                all.targetFloor !== passenger.targetFloor &&
+                all.currentFloor !== passenger.currentFloor
+            )
+            return passenger
+          }
+        })
       }
 
-      if (elevator.currentFloor === elevator.targetFloor) {
+      // Elevator stops at target floor and checks for queued passengers
+      if (
+        elevator.currentFloor === elevator.targetFloor &&
+        elevator.currentPassengers.length === 0
+      ) {
         if (elevator.inQueuePassenger.length > 0) {
           elevator.direction =
             elevator.inQueuePassenger[0].targetFloor > elevator.currentFloor ? 'up' : 'down'
@@ -281,18 +369,46 @@ const startElevatorUpdate = () => {
             (p) => p.currentFloor !== elevator.currentFloor
           )
         } else {
+          // No more passengers, elevator goes idle
           elevator.direction = 'idle'
           elevator.targetFloor = null
         }
       }
     })
-  }, 1000)
+  }, 7000)
 }
 
-// Initialize the system when the component is mounted
-onMounted(() => {
-  initializeSystem()
-})
+const requestElevator = () => {
+  // Ensure the floor values are valid
+  if (
+    currentFloor.value < 1 ||
+    currentFloor.value > numFloors.value ||
+    targetFloor.value < 1 ||
+    targetFloor.value > numFloors.value
+  ) {
+    alert(`Floors must be between 1 and ${numFloors.value}`)
+    return
+  }
+
+  if (targetFloor.value === currentFloor.value) {
+    alert('Target floor and current floor cannot be the same.')
+    return
+  }
+
+  const passenger = {
+    name: passengerName.value,
+    targetFloor: targetFloor.value,
+    currentFloor: currentFloor.value
+  }
+
+  allPassengers.value.push(passenger)
+  allRequests.value.push(passenger)
+  requestElevatorFromPassenger(passenger.name, passenger.targetFloor, passenger.currentFloor)
+
+  passengerName.value = ''
+  targetFloor.value = 1
+  currentFloor.value = 1
+}
 </script>
 
 <style scoped>
@@ -309,17 +425,20 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   margin-bottom: 20px;
+  gap: 10px;
 }
 
 .passenger-input-container {
   display: flex;
   justify-content: space-between;
   margin-bottom: 20px;
+  gap: 10px;
 }
 
 .input-group {
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 input[type='number'],

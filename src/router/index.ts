@@ -11,7 +11,7 @@ const router = createRouter({
         {
           path: '/',
           name: 'building',
-          component: () => import('@/views/Final.vue')
+          component: () => import('@/views/ElevatorSystem.vue')
         },
       ]
     }

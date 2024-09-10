@@ -85,6 +85,12 @@
         Elevator {{ elevatorIndex + 1 }}
       </div>
     </div>
+    {{ allPassengers }}
+    <br />
+    <br />
+    {{ allRequests }}
+    <br />
+    <br />
     {{ elevators }}
   </div>
 </template>
@@ -101,6 +107,7 @@ const currentFloor = ref(1)
 const targetFloor = ref(1)
 const elevators = ref([])
 const allPassengers = ref([])
+const allRequests = ref([])
 
 // Computed property for the grid layout style
 const gridStyle = computed(() => ({
@@ -126,7 +133,7 @@ const initializeSystem = () => {
 }
 
 // Request an elevator for a passenger
-const requestElevator = () => {
+const requestElevator1 = () => {
   if (targetFloor.value === currentFloor.value) {
     alert('Target floor and current floor cannot be the same.')
     return
@@ -259,8 +266,19 @@ const startElevatorUpdate = () => {
   setInterval(() => {
     elevators.value.forEach((elevator) => {
       if (elevator.direction !== 'idle') {
-        elevator.currentFloor += elevator.direction === 'up' ? 1 : -1
+        // Prevent elevators from going beyond floor limits
+        if (elevator.currentFloor === numFloors.value) {
+          elevator.direction = 'down'
+        } else if (elevator.currentFloor === 1) {
+          elevator.direction = 'up'
+        }
+        if (elevator.direction === 'up' && elevator.currentFloor < numFloors.value) {
+          elevator.currentFloor += 1
+        } else if (elevator.direction === 'down' && elevator.currentFloor > 1) {
+          elevator.currentFloor -= 1
+        }
 
+        // Passengers boarding
         const boardingPassengers = elevator.inQueuePassenger.filter(
           (passenger) => passenger.currentFloor === elevator.currentFloor
         )
@@ -269,17 +287,31 @@ const startElevatorUpdate = () => {
           (passenger) => passenger.currentFloor !== elevator.currentFloor
         )
 
+        // Update target floor
         elevator.targetFloor = getTargetFloorFromPassengers(
           elevator.currentPassengers,
           elevator.direction
         )
 
-        elevator.currentPassengers = elevator.currentPassengers.filter(
-          (passenger) => passenger.targetFloor !== elevator.currentFloor
-        )
+        // Remove passengers who have reached their target floor
+        elevator.currentPassengers = elevator.currentPassengers.filter((passenger) => {
+          if (passenger.targetFloor !== elevator.currentFloor) {
+            allPassengers.value = allPassengers.value.filter(
+              (all) =>
+                all.name !== passenger.name &&
+                all.targetFloor !== passenger.targetFloor &&
+                all.currentFloor !== passenger.currentFloor
+            )
+            return passenger
+          }
+        })
       }
 
-      if (elevator.currentFloor === elevator.targetFloor) {
+      // Elevator stops at target floor and checks for queued passengers
+      if (
+        elevator.currentFloor === elevator.targetFloor &&
+        elevator.currentPassengers.length === 0
+      ) {
         if (elevator.inQueuePassenger.length > 0) {
           elevator.direction =
             elevator.inQueuePassenger[0].targetFloor > elevator.currentFloor ? 'up' : 'down'
@@ -291,12 +323,45 @@ const startElevatorUpdate = () => {
             (p) => p.currentFloor !== elevator.currentFloor
           )
         } else {
+          // No more passengers, elevator goes idle
           elevator.direction = 'idle'
           elevator.targetFloor = null
         }
       }
     })
   }, 7000)
+}
+
+const requestElevator = () => {
+  // Ensure the floor values are valid
+  if (
+    currentFloor.value < 1 ||
+    currentFloor.value > numFloors.value ||
+    targetFloor.value < 1 ||
+    targetFloor.value > numFloors.value
+  ) {
+    alert(`Floors must be between 1 and ${numFloors.value}`)
+    return
+  }
+
+  if (targetFloor.value === currentFloor.value) {
+    alert('Target floor and current floor cannot be the same.')
+    return
+  }
+
+  const passenger = {
+    name: passengerName.value,
+    targetFloor: targetFloor.value,
+    currentFloor: currentFloor.value
+  }
+
+  allPassengers.value.push(passenger)
+  allRequests.value.push(passenger)
+  requestElevatorFromPassenger(passenger.name, passenger.targetFloor, passenger.currentFloor)
+
+  passengerName.value = ''
+  targetFloor.value = 1
+  currentFloor.value = 1
 }
 </script>
 
